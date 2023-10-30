@@ -18,5 +18,4 @@ replication_cnv_snakemake/**/*.avinput
 replication_cnv_snakemake/**/*.flagstat
 replication_cnv_snakemake/**/*.log
 replication_cnv_snakemake/**/*.pdf
-replication_cnv_snakemake/**/index/
 
