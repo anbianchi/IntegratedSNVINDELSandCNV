@@ -1,0 +1,525 @@
+SAMPLE_PAIRED, = glob_wildcards("reads/paired/{id}_1.fastq.gz")
+THREADS = 50
+
+rule all:
+    input: 
+        sx=expand("annotated_paired_{sample}.hg19_multianno.txt", sample=SAMPLE_PAIRED),
+        flagstat=expand("mapped/{sample}.bam.flagstat", sample=SAMPLE_PAIRED)
+
+rule trimmomatic_pe:
+    input:
+        r1 = "reads/paired/{sample}_1.fastq.gz",
+        r2 = "reads/paired/{sample}_2.fastq.gz"
+    output:
+        r1 = "trimmed/paired/{sample}_1_val_1.fq.gz",
+        r2 = "trimmed/paired/{sample}_2_val_2.fq.gz",
+        # reads where trimming entirely removed the mate
+        r1_unpaired="trimmed/paired/{sample}.1.unpaired.fastq.gz",
+        r2_unpaired="trimmed/paired/{sample}.2.unpaired.fastq.gz"
+    log:
+        "logs/paired/trimmomatic/{sample}.log"
+    params:
+        # list of trimmers (see manual)
+        trimmer=["ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:keepbothreads", "TRAILING:3","MAXINFO:40:0.9","MINLEN:36"],
+        # optional parameters
+        extra=""
+    threads:
+        THREADS
+    wrapper:
+        "v1.19.2/bio/trimmomatic/se" 
+
+rule bwa_index:
+    input:
+        "index/hg19.fa",
+    output:
+        idx=multiext("index/hg19", ".amb", ".ann", ".bwt", ".pac", ".sa"),
+    log:
+        "logs/paired/bwa_index/hg19.log",
+    message: """---start reference indexing---"""
+    threads: 50
+    params:
+        algorithm="bwtsw",   
+    wrapper:
+        "v1.19.2/bio/bwa/index"
+
+rule bwa_mem_paired:
+    input:
+        reads=["trimmed/paired/{sample}_1_val_1.fq.gz", "trimmed/paired/{sample}_2_val_2.fq.gz"],
+        # Index can be a list of (all) files created by bwa, or one of them
+        idx=multiext("index/hg19", ".amb", ".ann", ".bwt", ".pac", ".sa"),
+    output:
+        "mapped/{sample}.bam",
+    log:
+        "logs/paired/bwa_mem/{sample}.log",
+    params:
+        extra=r"-R '@RG\tID:{sample}\tSM:{sample}\tPL:ILLUMINA'",
+        sorting="none",  # Can be 'none', 'samtools' or 'picard'.
+        sort_order="queryname",  # Can be 'queryname' or 'coordinate'.
+        sort_extra="",  # Extra args for samtools/picard.
+    threads: THREADS
+    wrapper:
+        "v1.19.1/bio/bwa/mem"
+
+rule samtools_flagstat:
+    input:
+        "mapped/{sample}.bam",
+    output:
+        "mapped/{sample}.bam.flagstat",
+    log:
+        "logs/paired/flagstat/{sample}.log",
+    params:
+        extra="",  # optional params string
+    threads:
+        THREADS
+    wrapper:
+        "v2.6.0/bio/samtools/flagstat"
+
+rule mark_duplicates:
+    input:
+        bams="mapped/{sample}.bam",
+    output:
+        bam="mapped/{sample}.dedup.bam",
+        metrics="{sample}.metrics.txt",
+    log:
+        "logs/paired/picard/dedup/{sample}.log",
+    params:
+        extra="--REMOVE_DUPLICATES true --CREATE_INDEX true --VALIDATION_STRINGENCY SILENT --MAX_RECORDS_IN_RAM 999999 --TMP_DIR tmpPicard/ --ASSUME_SORT_ORDER queryname"
+    threads:
+        THREADS
+    wrapper:
+        "v1.23.4/bio/picard/markduplicates"
+
+rule sort_bam:
+    input:
+        "mapped/{sample}.dedup.bam",
+    output:
+        "mapped/{sample}.dsorted.bam",
+    log:
+        "logs/paired/sort_bam/{sample}.log",
+    params:
+        sort_order="coordinate",
+        extra="--CREATE_INDEX true"  # optional: Extra arguments for picard.
+    threads:
+        THREADS
+    wrapper:
+        "v1.23.4/bio/picard/sortsam"
+
+
+rule samtools_index:
+    input:
+       "mapped/{sample}.dsorted.bam",
+    output:
+        "mapped/{sample}.dsorted.bai",
+    log:
+        "logs/paired/samtools_index/{sample}.log",
+    params:
+        extra="",  # optional params string
+    threads: THREADS  # This value - 1 will be sent to -@
+    wrapper:
+ 	    "v1.19.2/bio/samtools/index"
+
+rule gatk_base_recalibrator:
+    input:
+        bam="mapped/{sample}.dsorted.bam",
+        ref="index/hg19.fa",
+        dict="index/hg19.dict",
+        known="gatkbundle/hg19/dbsnp_138.hg19.vcf",
+        indices="mapped/{sample}.dsorted.bai"
+    output:
+        recal_table="tables/{sample}.grp"
+    log:
+        "logs/paired/gatk/bqsr/{sample}.log"
+    params:
+        extra="--intervals 100bp_exon.bed --known-sites gatkbundle/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf --known-sites gatkbundle/hg19/1000G_phase1.indels.hg19.sites.vcf",
+    wrapper:
+        "v1.23.4/bio/gatk/baserecalibrator"
+
+
+rule gatk_applybqsr:
+    input:
+        bam="mapped/{sample}.dsorted.bam", 
+        ref="index/hg19.fa",
+        dict="index/hg19.dict",
+        recal_table="tables/{sample}.grp",
+    output:
+        bam="final/{sample}.final.bam",
+    log:
+        "logs/paired/gatk/gatk_applybqsr/{sample}.log",
+    params:
+        extra="--intervals 100bp_exon.bed",  # optional
+        java_opts="-XX:ParallelGCThreads=50",
+        embed_ref=True,  # embed the reference in cram output
+    threads:
+        THREADS
+    wrapper:
+        "v1.23.4/bio/gatk/applybqsr"
+
+
+rule cnmops:
+    input:
+        expand("final/{sample}.final.bam", sample=SAMPLE_PAIRED)        
+    output: 
+        "results/results_cnmops.bed"
+    log:
+        "logs/paired/cnmops/log.log"
+    shell:
+        "R < scriptmops.r --no-save"
+
+rule exomedepth:
+    input:
+        expand("final/{sample}.final.bam", sample=SAMPLE_PAIRED)
+    output:
+        "logs/paired/exomedepth/log.log",
+    log:
+        "logs/paired/exomedepth/log.log"
+    shell:
+        "R < exomeDepth_paired.r > {output}"
+
+rule annotsv:
+    input:
+        "results/results_cnmops.bed", expand("results/{sample}.final.bam.bed", sample=SAMPLE_PAIRED)
+    output:
+        cnmops="results/results_cnmops.annotated.tsv",
+        exomedepth=expand("results/{sample}.final.bam.annotated.tsv", sample=SAMPLE_PAIRED),
+    conda:
+        "approach"
+    log:
+        "logs/paired/annotsv/log.log"
+    shell:
+        "AnnotSV -annotationsDir /NFSHOME/abianchi/AnnotSV/share/AnnotSV/ -SVinputFile ./results/results_cnmops.bed -genomeBuild GRCh37 -outputDir ./results"
+        " | for entry in ./results/*.bam.bed; do AnnotSV -annotationsDir /NFSHOME/abianchi/AnnotSV/share/AnnotSV/ -SVinputFile $entry -svtBEDcol 4 -genomeBuild GRCh37 -outputDir ./results; done"
+
+
+rule merge:
+    input:
+       cnmops="results/results_cnmops.annotated.tsv",
+       exomedepth=expand("results/{sample}.final.bam.annotated.tsv", sample=SAMPLE_PAIRED),
+    output:
+        "logs/paired/merge/log.log",
+    log:
+        "logs/paired/merge/log.log"
+    shell:
+        "python clean_and_merge.py --prefix1 Exome --prefix2 results --paired_flag 1 --result_folder results --source_folder final > {output}"
+
+
+rule haplotype_caller:
+    input:
+        bam="final/{sample}.final.bam",
+        ref="index/hg19.fa"
+    output:
+        gvcf="final/{sample}.g.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/haplotype_caller/{sample}.log"
+    shell:
+        """
+        gatk --java-options '-Xmx150g' HaplotypeCaller \
+        -R {input.ref} \
+        -I {input.bam} \
+        -L 100bp_exon.bed \
+        -O {output.gvcf} \
+        --native-pair-hmm-threads 20 \
+        --emit-ref-confidence GVCF
+        """
+
+rule combine_gvcfs:
+    input:
+        gvcfs = [expand("final/{sample}.g.vcf", sample=SAMPLE_PAIRED)],
+        ref="index/hg19.fa"
+    output:
+        combined_gvcf="GENDB/combined.g.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/combine_gvcfs/gcvs.log"
+    params:
+        variant_files=lambda wildcards, input: ' '.join(['--variant ' + gvcf for gvcf in input.gvcfs])
+    shell:
+        """
+        gatk CombineGVCFs --reference {input.ref} {params.variant_files} --output {output.combined_gvcf} --intervals 100bp_exon.bed --tmp-dir tmpgenomicsdb
+        """
+
+rule genotype_gvcfs:
+    input:
+        gvcfs = "GENDB/combined.g.vcf",
+        ref="index/hg19.fa"
+    output:
+        "GENDB/finalexperimentGVCF.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/genotype_gvcfs/ggvcf.log"
+    shell:
+        """
+        gatk GenotypeGVCFs --reference {input.ref} --variant {input.gvcfs} -output {output} --intervals 100bp_exon.bed --tmp-dir tmpgenomicsdb
+        """
+
+rule variant_recalibrator_snp:
+    input:
+        vcf="GENDB/finalexperimentGVCF.vcf",
+        ref="index/hg19.fa"
+    output:
+        recal="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.SNP.recal",
+        tranches="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.AS.tranches"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/variant_recalibrator_snp/vrs.log"
+    shell:
+        """
+        gatk VariantRecalibrator \
+        -R {input.ref} \
+        -V {input.vcf} \
+        --resource:hapmap,known=false,training=true,truth=true,prior=15.0 gatkbundle/hg19/hapmap_3.3.hg19.sites.vcf \
+        --resource:omni,known=false,training=true,truth=true,prior=12.0 gatkbundle/hg19/1000G_omni2.5.hg19.sites.vcf \
+        --resource:1000G,known=false,training=true,truth=false,prior=10.0 gatkbundle/hg19/1000G_phase1.snps.high_confidence.hg19.sites.vcf \
+        --resource:dbsnp,known=true,training=false,truth=false,prior=2.0 gatkbundle/hg19/dbsnp_138.hg19.vcf \
+        -an DP -an QD -an FS -an SOR -an MQ -an MQRankSum -an ReadPosRankSum \
+        --mode SNP \
+        -tranche 99.5 -tranche 99.5 -tranche 99.5 -tranche 99.5 -tranche 99.5 -tranche 99.5 -tranche 99.5 \
+        -O {output.recal} \
+        --tranches-file {output.tranches} \
+        --max-gaussians 4
+        """
+
+rule apply_vqsr_snp:
+    input:
+        vcf="GENDB/finalexperimentGVCF.vcf",
+        recal="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.SNP.recal",
+        tranches="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.AS.tranches",
+        ref="index/hg19.fa"
+    output:
+        recalibrated_vcf="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.recalibratedsnp.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/apply_vqsr_snp/avrs.log"
+    shell:
+        """
+        gatk ApplyVQSR \
+        -R {input.ref} \
+        -V {input.vcf} \
+        --mode SNP \
+        --truth-sensitivity-filter-level 90.0 \
+        --recal-file {input.recal} \
+        --tranches-file {input.tranches} \
+        -O {output.recalibrated_vcf}
+        """
+
+rule variant_recalibrator_indel:
+    input:
+        recalibrated_vcf="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.recalibratedsnp.vcf",
+        ref="index/hg19.fa"
+    output:
+        recal="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.INDEL.recal",
+        tranches="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.INDEL.tranches"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/variant_recalibrator_indel/vri.log"
+    shell:
+        """
+        gatk VariantRecalibrator \
+        -R {input.ref} \
+        -V {input.recalibrated_vcf} \
+        --resource:mills,known=false,training=true,truth=true,prior=12.0 gatkbundle/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf \
+        --resource:dbsnp,known=true,training=false,truth=false,prior=2.0 gatkbundle/hg19/dbsnp_138.hg19.vcf \
+        -an DP -an QD -an FS -an SOR -an MQ -an MQRankSum -an ReadPosRankSum \
+        --mode INDEL \
+        -tranche 99.0 -tranche 99.0 -tranche 99.0 -tranche 99.0 -tranche 99.0 -tranche 99.0 -tranche 99.0 \
+        -O {output.recal} \
+        --tranches-file {output.tranches} \
+        --max-gaussians 4
+        """
+
+rule apply_vqsr_indel:
+    input:
+        recalibrated_vcf="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.recalibratedsnp.vcf",
+        recal="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.INDEL.recal",
+        tranches="alignedFiles/sortedBam/gvcf/finalexperimentGVCF.INDEL.tranches",
+        ref="index/hg19.fa"
+    output:
+        final_vcf="GENDB/final_WITHVQSR.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/apply_vqsr_indel/avri.log"
+    shell:
+        """
+        gatk ApplyVQSR \
+        -R {input.ref} \
+        -V {input.recalibrated_vcf} \
+        --mode INDEL \
+        --truth-sensitivity-filter-level 90.0 \
+        --recal-file {input.recal} \
+        --tranches-file {input.tranches} \
+        -O {output.final_vcf}
+        """
+
+rule select_variants_snp:
+    input:
+        final_vcf="GENDB/final_WITHVQSR.vcf",
+        ref="index/hg19.fa"
+    output:
+        snp_vcf="GENDB/final_filteredVQSR.hsnps.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/select_variants_snp/svs.log"
+    shell:
+        """
+        gatk SelectVariants \
+        -R {input.ref} \
+        -V {input.final_vcf} \
+        -L 100bp_exon.bed \
+        -select-type SNP \
+        -O {output.snp_vcf}
+        """
+
+rule select_variants_indel:
+    input:
+        final_vcf="GENDB/final_WITHVQSR.vcf",
+        ref="index/hg19.fa"
+    output:
+        indel_vcf="GENDB/final_filteredVQSR.hindels.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/select_variants_indel/svi.log"
+    shell:
+        """
+        gatk SelectVariants \
+        -R {input.ref} \
+        -V {input.final_vcf} \
+        -L 100bp_exon.bed \
+        -select-type INDEL \
+        -O {output.indel_vcf}
+        """
+
+rule variant_filtration_snp:
+    input:
+        snp_vcf="GENDB/final_filteredVQSR.hsnps.vcf",
+        ref="index/hg19.fa"
+    output:
+        filtered_snp_vcf="GENDB/final_filteredVQSR.semisnp.vcf"
+    conda:
+        "approach"
+    log:    
+        "logs/paired/gatk/variant_filtration_snp/vfs.log"
+    shell:
+        """
+        gatk VariantFiltration \
+        -R {input.ref} \
+        -V {input.snp_vcf} \
+        -L 100bp_exon.bed \
+        --filter-expression "QD < 2.0" --filter-name "QD_lt_2" \
+        --filter-expression "FS > 60.0" --filter-name "FS_gt_60" \
+        --filter-expression "MQ < 40.0" --filter-name "MQ_lt_40" \
+        --filter-expression "MQRankSum < -12.5" --filter-name "MQRS_lt_n12.5" \
+        --filter-expression "ReadPosRankSum < -8.0" --filter-name "RPRS_lt_n8" \
+        -O {output.filtered_snp_vcf}
+        """
+
+rule variant_filtration_indel:
+    input:
+        indel_vcf="GENDB/final_filteredVQSR.hindels.vcf",
+        ref="index/hg19.fa"
+    output:
+        filtered_indel_vcf="GENDB/final_filteredVQSR.semiindel.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/variant_filtration_indel/vfi.log"
+    shell:
+        """
+        gatk VariantFiltration \
+        -R {input.ref} \
+        -V {input.indel_vcf} \
+        -L 100bp_exon.bed \
+        --filter-expression "QD < 2.0" --filter-name "QD_lt_2" \
+        --filter-expression "FS > 200.0" --filter-name "FS_gt_200" \
+        --filter-expression "ReadPosRankSum < -20.0" --filter-name "RPRS_lt_n20" \
+        -O {output.filtered_indel_vcf}
+        """
+
+rule merge_vcfs:
+    input:
+        filtered_snp_vcf="GENDB/final_filteredVQSR.semisnp.vcf",
+        filtered_indel_vcf="GENDB/final_filteredVQSR.semiindel.vcf"
+    output:
+        merged_vcf="GENDB/final_filteredVQSR.ALMOST.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/merge_vcfs/mv.log"
+    shell:
+        """
+        gatk MergeVcfs \
+        -I {input.filtered_snp_vcf} \
+        -I {input.filtered_indel_vcf} \
+        -O {output.merged_vcf}
+        """
+
+rule select_variants:
+    input:
+        merged_vcf="GENDB/final_filteredVQSR.ALMOST.vcf",
+        ref="index/hg19.fa"
+    output:
+        final_vcf="GENDB/final_filteredVQSR.END.vcf"
+    conda:
+        "approach"
+    log:
+        "logs/paired/gatk/select_variants/sv.log"
+    shell:
+        """
+        gatk SelectVariants \
+        -R {input.ref} \
+        -V {input.merged_vcf} \
+        -L 100bp_exon.bed \
+        -O {output.final_vcf} \
+        --exclude-filtered
+        """
+
+rule bcftools:
+    input:
+        final_vcf="GENDB/final_filteredVQSR.END.vcf",
+        annotated_dir="GENDB/annovar/"
+    output:
+        final_vcf_gz="GENDB/final_filteredVQSR.END.vcf.gz"
+    log:
+        "logs/paired/bcftools/log.log"
+    shell:
+        """
+        mkdir -p {input.annotated_dir}
+        for sample in `bcftools query -l {input.final_vcf}`; do
+            bcftools view -c1 -Ov -s $sample -o {input.annotated_dir}/${{sample}}.vcf {input.final_vcf}
+        done
+        bcftools view -Oz -o {output.final_vcf_gz} {input.final_vcf}
+        """
+    
+rule annovar_annotation:
+    input:
+        final_vcf="GENDB/final_filteredVQSR.END.vcf",
+        annotated_dir="GENDB/annovar/"
+    output:
+        annotated_files=expand("annotated_paired_{sample}.hg19_multianno.txt", sample=SAMPLE_PAIRED)    
+    log:
+        "logs/paired/annovar/log.log"
+    shell:
+        """
+        FILES={input.annotated_dir}/*.vcf
+        for file in $FILES; do
+            name=${{file##*/}}
+            namefinal=${{name%.vcf}}
+            ../annovar/table_annovar.pl {input.annotated_dir}/$name ../annovar/humandb/ \
+            -buildver hg19 -remove \
+            -protocol refGene,clinvar_20221231,exac03,ALL.sites.2015_08,gnomad211_exome \
+            -operation g,f,f,f,f \
+            -thread 20 \
+            -polish \
+            -vcfinput \
+            -out annovar \
+            --outfile annotated_paired_$namefinal 
+        done
+        """
