@@ -11,7 +11,6 @@ replication_cnv_snakemake/**/*.bam
 replication_cnv_snakemake/**/*.bam.bai
 replication_cnv_snakemake/**/*.fastq
 replication_cnv_snakemake/**/*.fastq.gz
-replication_cnv_snakemake/**/gatkbundle*
 replication_cnv_snakemake/**/*.grp
 replication_cnv_snakemake/**/*.xlsx
 replication_cnv_snakemake/**/*.tsv
