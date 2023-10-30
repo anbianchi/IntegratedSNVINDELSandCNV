@@ -1,5 +1,6 @@
 *.html
 *.txt
+*.sh
 replication_cnv_snakemake/**/.snakemake/
 replication_cnv_snakemake/**/*.tranches
 replication_cnv_snakemake/**/*.recal
