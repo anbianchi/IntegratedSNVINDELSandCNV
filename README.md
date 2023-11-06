@@ -26,9 +26,14 @@ We introduce an adaptable method for analyzing SNVs, INDELs, and CNVs from Whole
 - Ensure ~200GB of disk space.
 - Clone or download this repository.
 
-### Dataset Retrieval
-1. [Download the first dataset from ENA browser](https://www.ebi.ac.uk/ena/browser/view/PRJEB3235).
-2. For the second dataset, request access.
+## Dataset Information
+The datasets employed for this validation exercise encompass two WES datasets: [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) (36 items) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704). The PRJEB3235 dataset is freely accessible from the Sequence Read Archive (SRA) and provides sequencing data for eleven BC cases and seven HapMap controls. The PRJEB31704 dataset, we employed 7 Illumina samples that were transmitted with permission.
+
+### Accessing the Dataset
+- Visit [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704).
+- Download using methods from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/).
+
+> **Note**: Adherence to usage guidelines ensures ethical data usage.
 
 ### Tools & Setup
 1. **Annovar**: [Download and configure Annovar](https://annovar.openbioinformatics.org/en/latest/user-guide/download/), following its official documentation. 
@@ -67,17 +72,8 @@ We introduce an adaptable method for analyzing SNVs, INDELs, and CNVs from Whole
       ```
    - Navigate to the appropriate folder inside "replication_cnv_snakemake/Snakefiles" and execute the pipeline with Snakemake.
 
-## Dataset Information
-Datasets are publicly sourced. The second dataset includes 7 Illumina samples from [this paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6813924/). Requests for data can be made to the corresponding author.
-
 ### Key Features
 - **Accessibility**: The dataset promotes open and collaborative research.
-
-### Accessing the Dataset
-- Visit [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704).
-- Download using methods from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/).
-
-> **Note**: Adherence to usage guidelines ensures ethical data usage.
 
 ## Directory Structure
 
