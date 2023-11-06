@@ -7,7 +7,6 @@ import argparse
 patients_dict = {1:'bc', 2:'bc',3:'bc',4:'bc',5:'bc',6:'bc',7:'bc',8:'sane',9:'sane',10:'sane',11:'sane',12:'sane',13:'sane',
                  14:'sane',15:'bc',16:'bc',17:'bc',18:'bc', 19:'bc', 20:'bc',21:'bc',22:'bc',23:'bc',24:'bc',25:'bc'}
 
-
 parser = argparse.ArgumentParser(description='Merge results together.')
 
 parser.add_argument('--prefix1', type=str, help= "Prefix of the files of the EXDE tool. Ex. \"ERR\", \"HI\"")

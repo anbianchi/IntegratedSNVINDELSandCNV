@@ -1,0 +1,40 @@
+FROM condaforge/mambaforge:latest
+
+WORKDIR /app 
+COPY . .
+RUN mkdir GENDB
+RUN mkdir alignedFiles
+RUN mkdir alignedFiles/sortedBam/
+RUN mkdir alignedFiles/sortedBam/gvcf
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt install -y make
+RUN apt-get -y install curl
+RUN apt-get install -y \
+  g++ \
+  libbz2-dev \
+  liblzma-dev \
+  tar \
+  tcl \
+  tcllib \
+  unzip \
+  wget \
+  zlib1g-dev
+  
+RUN   mamba create -c conda-forge -c bioconda -n approach snakemake -y 
+RUN   echo "conda activate approach" >> ~/.bashrc
+
+RUN   mamba install -y -c conda-forge r-base
+RUN   conda install -y -c bioconda samtools
+RUN   conda install -y -c bioconda trimmomatic
+RUN   conda install -y -c conda-forge -c bioconda gatk4
+RUN   conda install -y -c bioconda annotsv
+RUN   conda install -y -c bioconda bcftools
+
+RUN   R -e "install.packages('BiocManager', repos='http://cran.us.r-project.org')"
+RUN   R -e 'BiocManager::install("ExomeDepth")'
+RUN   R -e 'BiocManager::install("DNAcopy")'
+RUN   R -e 'BiocManager::install("cn.mops")'
+
+#RUN   echo "snakemake --use-conda --cores" >> ~/.bashrc # 
+
