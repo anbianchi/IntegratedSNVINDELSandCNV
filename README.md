@@ -8,8 +8,6 @@
   - [Prerequisites](#prerequisites)
   - [Dataset Retrieval](#dataset-retrieval)
   - [Tools & Setup](#tools--setup)
-  - [Pipeline Directory Setup](#pipeline-directory-setup)
-  - [Pipeline Configuration](#pipeline-configuration)
   - [Installation Options](#installation-options)
 - [Dataset Information](#dataset-information)
 - [Directory Structure](#directory-structure)
@@ -37,22 +35,17 @@ We introduce an adaptable method for analyzing SNVs, INDELs, and CNVs from Whole
 2. **GATK Bundle**: [Acquire the GATK bundle (for hg19 genome)](https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references).
 3. **AnnotSV**: [Install AnnotSV](https://github.com/lgmgeo/AnnotSV), following its official documentation.
 
-### Pipeline Directory Setup
-- Use VS Code to navigate to the pipeline directory.
-- Follow the provided structure for placing data, configuration files, and tools.
-
-### Pipeline Configuration
-1. Choose the appropriate snakefile from the Snakefiles folder.
-2. Open Snakefile and set the number of threads for Snakemake.
-3. Create config files for datasets based on provided examples.
-
 ### Installation Options
 1. **Using Docker**:
    - [Download and install Docker](https://www.docker.com/products/docker-desktop/).
    - Configure Docker via the app settings.
-   - Build and run the pipeline using the provided commands.
+   - Build and run the pipeline using the following:
+     ```bash
+        docker build -t bioinfpipeline .
+        docker run --name pipelinerun -it bioinfpipeline
+        ```
    - Monitor progress and retrieve results within the Docker app.
-   - Optionally, execute specific parts of the pipeline as directed.
+   - Optionally, execute specific parts of the pipeline changing the current snakefile with the respective Snakefiles located in `SNKFL/SNKFR`, `SNKFRPaired`, `SNKFRUnpaired` directories by moving the file to the main directory.
 
 2. **Using Snakemake (No Docker)**:
    - [Download and install Anaconda](https://docs.anaconda.com/free/anaconda/install/index.html).
