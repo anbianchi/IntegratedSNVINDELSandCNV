@@ -6,10 +6,10 @@
   - [Results](#results)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
-  - [Dataset Retrieval](#dataset-retrieval)
+  - [Dataset Information](#dataset-information)
+  - [Accessing the Dataset](#accessing-the-dataset)
   - [Tools & Setup](#tools--setup)
   - [Installation Options](#installation-options)
-- [Dataset Information](#dataset-information)
 - [Directory Structure](#directory-structure)
 
 ## Description
@@ -26,7 +26,7 @@ We introduce an adaptable method for analyzing SNVs, INDELs, and CNVs from Whole
 - Ensure ~200GB of disk space.
 - Clone or download this repository.
 
-## Dataset Information
+### Dataset Information
 The datasets employed for this validation exercise encompass two WES datasets: [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) (36 items) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704). The PRJEB3235 dataset is freely accessible from the Sequence Read Archive (SRA) and provides sequencing data for eleven BC cases and seven HapMap controls. The PRJEB31704 dataset, we employed 7 Illumina samples that were transmitted with permission.
 
 ### Accessing the Dataset
