@@ -6,10 +6,12 @@
   - [Results](#results)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
-  - [Dataset Information](#dataset-information)
-  - [Accessing the Dataset](#accessing-the-dataset)
+  - [Dataset Retrieval](#dataset-retrieval)
   - [Tools & Setup](#tools--setup)
+  - [Pipeline Directory Setup](#pipeline-directory-setup)
+  - [Pipeline Configuration](#pipeline-configuration)
   - [Installation Options](#installation-options)
+- [Dataset Information](#dataset-information)
 - [Directory Structure](#directory-structure)
 
 ## Description
@@ -26,31 +28,31 @@ We introduce an adaptable method for analyzing SNVs, INDELs, and CNVs from Whole
 - Ensure ~200GB of disk space.
 - Clone or download this repository.
 
-### Dataset Information
-The datasets employed for this validation exercise encompass two WES datasets: [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) (36 items) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704). The PRJEB3235 dataset is freely accessible from the Sequence Read Archive (SRA) and provides sequencing data for eleven BC cases and seven HapMap controls. The PRJEB31704 dataset, we employed 7 Illumina samples that were transmitted with permission.
-
-### Accessing the Dataset
-- Visit [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704).
-- Download using methods from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/).
-
-> **Note**: Adherence to usage guidelines ensures ethical data usage.
+### Dataset Retrieval
+1. [Download the first dataset from ENA browser](https://www.ebi.ac.uk/ena/browser/view/PRJEB3235).
+2. For the second dataset, request access.
 
 ### Tools & Setup
 1. **Annovar**: [Download and configure Annovar](https://annovar.openbioinformatics.org/en/latest/user-guide/download/), following its official documentation. 
 2. **GATK Bundle**: [Acquire the GATK bundle (for hg19 genome)](https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references).
 3. **AnnotSV**: [Install AnnotSV](https://github.com/lgmgeo/AnnotSV), following its official documentation.
 
+### Pipeline Directory Setup
+- Use VS Code to navigate to the pipeline directory.
+- Follow the provided structure for placing data, configuration files, and tools.
+
+### Pipeline Configuration
+1. Choose the appropriate snakefile from the Snakefiles folder.
+2. Open Snakefile and set the number of threads for Snakemake.
+3. Create config files for datasets based on provided examples.
+
 ### Installation Options
 1. **Using Docker**:
    - [Download and install Docker](https://www.docker.com/products/docker-desktop/).
    - Configure Docker via the app settings.
-   - Build and run the pipeline using the following:
-     ```bash
-        docker build -t bioinfpipeline .
-        docker run --name pipelinerun -it bioinfpipeline
-        ```
+   - Build and run the pipeline using the provided commands.
    - Monitor progress and retrieve results within the Docker app.
-   - Optionally, execute specific parts of the pipeline changing the current snakefile with the respective Snakefiles located in `SNKFL/SNKFR`, `SNKFRPaired`, `SNKFRUnpaired` directories by moving the file to the main directory.
+   - Optionally, execute specific parts of the pipeline as directed.
 
 2. **Using Snakemake (No Docker)**:
    - [Download and install Anaconda](https://docs.anaconda.com/free/anaconda/install/index.html).
@@ -72,8 +74,17 @@ The datasets employed for this validation exercise encompass two WES datasets: [
       ```
    - Navigate to the appropriate folder inside "replication_cnv_snakemake/Snakefiles" and execute the pipeline with Snakemake.
 
+## Dataset Information
+Datasets are publicly sourced. The second dataset includes 7 Illumina samples from [this paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6813924/). Requests for data can be made to the corresponding author.
+
 ### Key Features
 - **Accessibility**: The dataset promotes open and collaborative research.
+
+### Accessing the Dataset
+- Visit [PRJEB3235](https://www.ncbi.nlm.nih.gov/bioproject/PRJEB3235) and [PRJEB31704](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB31704).
+- Download using methods from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/).
+
+> **Note**: Adherence to usage guidelines ensures ethical data usage.
 
 ## Directory Structure
 
